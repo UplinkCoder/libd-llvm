@@ -106,10 +106,10 @@ final class LLVMBackend {
 		version(OSX) {
 			auto triple = "x86_64-apple-darwin9".ptr;
 		} else {
-			auto triple = "x86_64-pc-linux-gnu".ptr;
+			auto triple = "i686-pc-linux-gnu".ptr;
 		}
 		
-		auto targetMachine = LLVMCreateTargetMachine(LLVMGetFirstTarget(), triple, "x86-64".ptr, "".ptr, LLVMCodeGenOptLevel.Default, LLVMRelocMode.Default, LLVMCodeModel.Default);
+		auto targetMachine = LLVMCreateTargetMachine(LLVMGetNextTarget(LLVMGetFirstTarget()), triple, "i686".ptr, "".ptr, LLVMCodeGenOptLevel.Default, LLVMRelocMode.Default, LLVMCodeModel.Default);
 		scope(exit) LLVMDisposeTargetMachine(targetMachine);
 		
 		/*

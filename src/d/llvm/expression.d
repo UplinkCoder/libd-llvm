@@ -499,9 +499,13 @@ struct ExpressionGen {
 		} else if(typeid(type) is typeid(PointerType)) {
 			ptr = visit(e.sliced);
 		} else if(auto asArray = cast(ArrayType) type) {
-			length = LLVMConstInt(LLVMInt64TypeInContext(llvmCtx), asArray.size, false);
-			
-			auto zero = LLVMConstInt(LLVMInt64TypeInContext(llvmCtx), 0, false);
+			version (D_LP64) {
+				length = LLVMConstInt(LLVMInt64TypeInContext(llvmCtx), asArray.size, false);
+				auto zero = LLVMConstInt(LLVMInt32TypeInContext(llvmCtx), 0, false);
+			} else {
+				length = LLVMConstInt(LLVMInt32TypeInContext(llvmCtx), asArray.size, false);	
+				auto zero = LLVMConstInt(LLVMInt32TypeInContext(llvmCtx), 0, false);
+			}
 			ptr = LLVMBuildInBoundsGEP(builder, addressOf(e.sliced), &zero, 1, "");
 		} else {
 			assert(0, "Don't know how to slice " ~ e.type.toString(context));

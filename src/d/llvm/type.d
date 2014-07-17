@@ -229,7 +229,11 @@ final class TypeGen {
 	
 	LLVMTypeRef visit(SliceType t) {
 		LLVMTypeRef[2] types;
-		types[0] = LLVMInt64TypeInContext(llvmCtx);
+		version (D_LP64) {
+			types[0] = LLVMInt64TypeInContext(llvmCtx);
+		} else {
+			types[0] = LLVMInt32TypeInContext(llvmCtx);
+		}
 		types[1] = LLVMPointerType(visit(t.sliced), 0);
 		
 		return LLVMStructTypeInContext(llvmCtx, types.ptr, 2, false);
