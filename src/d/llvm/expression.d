@@ -501,7 +501,7 @@ struct ExpressionGen {
 		} else if(auto asArray = cast(ArrayType) type) {
 			version (D_LP64) {
 				length = LLVMConstInt(LLVMInt64TypeInContext(llvmCtx), asArray.size, false);
-				auto zero = LLVMConstInt(LLVMInt32TypeInContext(llvmCtx), 0, false);
+				auto zero = LLVMConstInt(LLVMInt64TypeInContext(llvmCtx), 0, false);
 			} else {
 				length = LLVMConstInt(LLVMInt32TypeInContext(llvmCtx), asArray.size, false);	
 				auto zero = LLVMConstInt(LLVMInt32TypeInContext(llvmCtx), 0, false);
@@ -510,10 +510,13 @@ struct ExpressionGen {
 		} else {
 			assert(0, "Don't know how to slice " ~ e.type.toString(context));
 		}
-		
-		auto first = LLVMBuildZExt(builder, visit(e.first[0]), LLVMInt64TypeInContext(llvmCtx), "");
-		auto second = LLVMBuildZExt(builder, visit(e.second[0]), LLVMInt64TypeInContext(llvmCtx), "");
-		
+		//version (D_LP64) {
+			auto first = LLVMBuildZExt(builder, visit(e.first[0]), LLVMInt64TypeInContext(llvmCtx), "");
+			auto second = LLVMBuildZExt(builder, visit(e.second[0]), LLVMInt64TypeInContext(llvmCtx), "");
+		//} else {
+		//	auto first = LLVMBuildZExt(builder, visit(e.first[0]), LLVMInt32TypeInContext(llvmCtx), "");
+                //      auto second = LLVMBuildZExt(builder, visit(e.second[0]), LLVMInt32TypeInContext(llvmCtx), "");
+		//}
 		auto condition = LLVMBuildICmp(builder, LLVMIntPredicate.ULE, first, second, "");
 		if(length) {
 			condition = LLVMBuildAnd(builder, condition, LLVMBuildICmp(builder, LLVMIntPredicate.ULE, second, length, ""), "");
@@ -879,8 +882,11 @@ struct AddressOfGen {
 			auto i = eg.visit(index);
 			
 			auto length = LLVMBuildExtractValue(builder, slice, 0, ".length");
-			
-			auto condition = LLVMBuildICmp(builder, LLVMIntPredicate.ULT, LLVMBuildZExt(builder, i, LLVMInt64TypeInContext(llvmCtx), ""), length, "");
+			//version (D_LP64) {
+				auto condition = LLVMBuildICmp(builder, LLVMIntPredicate.ULT, LLVMBuildZExt(builder, i, LLVMInt64TypeInContext(llvmCtx), ""), length, "");
+			//} else {
+			//	auto condition = LLVMBuildICmp(builder, LLVMIntPredicate.ULT, LLVMBuildZExt(builder, i, LLVMInt32TypeInContext(llvmCtx), ""), length, "");
+			//}
 			eg.genBoundCheck(location, condition);
 			
 			auto ptr = LLVMBuildExtractValue(builder, slice, 1, ".ptr");
@@ -893,19 +899,31 @@ struct AddressOfGen {
 			auto ptr = visit(indexed);
 			auto i = eg.visit(index);
 			
-			auto condition = LLVMBuildICmp(
-				builder,
-				LLVMIntPredicate.ULT,
+			//version (D_LP64) {
+				auto condition = LLVMBuildICmp(
+                               	builder,
+                               	LLVMIntPredicate.ULT,
 				LLVMBuildZExt(builder, i, LLVMInt64TypeInContext(llvmCtx), ""),
 				LLVMConstInt(LLVMInt64TypeInContext(llvmCtx), asArray.size, false),
-				"",
-			);
+				"",);
+			//} else {
+			//	auto condition = LLVMBuildICmp(
+                        //      builder,
+                        //      LLVMIntPredicate.ULT,  
+			//	LLVMBuildZExt(builder, i, LLVMInt32TypeInContext(llvmCtx), ""),
+                        //     	LLVMConstInt(LLVMInt32TypeInContext(llvmCtx), asArray.size, false),
+			//	"",);
+			//}
 			
 			eg.genBoundCheck(location, condition);
 			
 			LLVMValueRef indices[2];
-			indices[0] = LLVMConstInt(LLVMInt64TypeInContext(llvmCtx), 0, false);
-			indices[1] = i;
+			version (D_LP64) {
+				indices[0] = LLVMConstInt(LLVMInt64TypeInContext(llvmCtx), 0, false);
+			} else {
+				indices[0] = LLVMConstInt(LLVMInt32TypeInContext(llvmCtx), 0, false);
+			}
+				indices[1] = i;
 			
 			return LLVMBuildInBoundsGEP(builder, ptr, indices.ptr, indices.length, "");
 		}
