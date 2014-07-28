@@ -26,8 +26,9 @@ final class LLVMBackend {
 	
 	private uint optLevel;
 	private string linkerParams;
-	
-	this(Context context, string name, uint optLevel, string linkerParams) {
+	private uint bitWidth;
+
+	this(Context context, string name, uint optLevel, string linkerParams, uint bitWidth) {
 		LLVMInitializeX86TargetInfo();
 		LLVMInitializeX86Target();
 		LLVMInitializeX86TargetMC();
@@ -37,8 +38,9 @@ final class LLVMBackend {
 		
 		this.optLevel = optLevel;
 		this.linkerParams = linkerParams;
+		this.bitWidth = bitWidth;
 		
-		pass = new CodeGenPass(context, name);
+		pass = new CodeGenPass(context, name, bitWidth);
 		
 		char* errorPtr;
 		auto creationError = LLVMCreateJITCompilerForModule(&executionEngine, pass.dmodule, 0, &errorPtr);
@@ -105,11 +107,20 @@ final class LLVMBackend {
 		
 		version(OSX) {
 			auto triple = "x86_64-apple-darwin9".ptr;
-		} else {
+		} version (linux) {
 			auto triple = "x86_64-pc-linux-gnu".ptr;
 		}
+		LLVMTargetMachineRef targetMachine;
+		switch (bitWidth) {
+			case 32 : 
+				targetMachine = LLVMCreateTargetMachine(LLVMGetNextTarget(LLVMGetFirstTarget()), triple, "i386".ptr, "".ptr, LLVMCodeGenOptLevel.Default, LLVMRelocMode.Default, LLVMCodeModel.Default);
+			break;
+			case 64 : 
+				targetMachine = LLVMCreateTargetMachine(LLVMGetFirstTarget(), triple, "x86-64".ptr, "".ptr, LLVMCodeGenOptLevel.Default, LLVMRelocMode.Default, LLVMCodeModel.Default);
+			break;
+			default : assert(0,"unspecifyed bitWidth");
+		}
 		
-		auto targetMachine = LLVMCreateTargetMachine(LLVMGetFirstTarget(), triple, "x86-64".ptr, "".ptr, LLVMCodeGenOptLevel.Default, LLVMRelocMode.Default, LLVMCodeModel.Default);
 		scope(exit) LLVMDisposeTargetMachine(targetMachine);
 		
 		/*
@@ -144,7 +155,10 @@ final class LLVMBackend {
 	}
 	
 	void link(string objFile, string executable) {
-		auto linkCommand = "gcc -o " ~ escapeShellFileName(executable) ~ " " ~ escapeShellFileName(objFile) ~ linkerParams ~ " -lsdrt";
+		string stdlib = "sdrt";
+                if (bitWidth==32) stdlib ~= "32";
+
+		auto linkCommand = "gcc -o " ~ escapeShellFileName(executable) ~ " " ~ escapeShellFileName(objFile) ~ linkerParams ~ " -l"~stdlib;
 		
 		writeln(linkCommand);
 		wait(spawnShell(linkCommand));
