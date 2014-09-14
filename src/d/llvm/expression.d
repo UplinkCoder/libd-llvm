@@ -472,8 +472,8 @@ struct ExpressionGen {
 		auto args = e.args.map!(a => visit(a)).array();
 		
 		auto type = pass.visit(e.type);
-		LLVMValueRef size = LLVMSizeOf(type);
-		
+		LLVMValueRef size =  LLVMConstTrunc(LLVMSizeOf(type),LLVMPtrTypeInContext(pass.llvmCtx));
+
 		auto alloc = buildCall(druntimeGen.getAllocMemory(), [size]);
 		auto ptr = LLVMBuildPointerCast(builder, alloc, type, "");
 		LLVMAddInstrAttribute(alloc, 0, LLVMAttribute.NoAlias);
