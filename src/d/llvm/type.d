@@ -213,7 +213,7 @@ final class TypeGen {
 	
 	LLVMTypeRef visit(SliceType t) {
 		LLVMTypeRef[2] types;
-		types[0] = LLVMIntTypeInContext(llvmCtx,pass.bitWidth);
+		types[0] = getPtrTypeInContext(llvmCtx);
 		types[1] = LLVMPointerType(visit(t.sliced), 0);
 		
 		return LLVMStructTypeInContext(llvmCtx, types.ptr, 2, false);

@@ -27,8 +27,8 @@ final class StringGen {
 			LLVMSetInitializer(globalVar, charArray);
 			LLVMSetLinkage(globalVar, LLVMLinkage.Private);
 			LLVMSetGlobalConstant(globalVar, true);
-			
-			auto length = LLVMConstInt(LLVMIntTypeInContext(pass.llvmCtx,pass.bitWidth), str.length, false);
+
+			auto length = LLVMConstInt(pass.getPtrTypeInContext(pass.llvmCtx), str.length, false);
 			
 			/*
 			// skip 0 termination.
