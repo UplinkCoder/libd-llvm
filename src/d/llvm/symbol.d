@@ -273,7 +273,7 @@ final class SymbolGen {
 			import d.llvm.expression;
 			auto eg = ExpressionGen(pass);
 			
-			LLVMValueRef size = LLVMConstTrunc(LLVMSizeOf(ctxType),LLVMIntTypeInContext(pass.llvmCtx,pass.bitWidth));
+			LLVMValueRef size = LLVMConstTrunc(LLVMSizeOf(ctxType),getPtrTypeInContext(llvmCtx));
 			auto alloc = eg.buildCall(druntimeGen.getAllocMemory(), [size]);
 			LLVMAddInstrAttribute(alloc, 0, LLVMAttribute.NoAlias);
 			

@@ -25,7 +25,7 @@ import std.string;
 
 final class CodeGenPass {
 	Context context;
-	uint bitWidth;
+	private int bitWidth;
 	private SymbolGen symbolGen;
 	private TypeGen typeGen;
 	
@@ -145,6 +145,11 @@ final class CodeGenPass {
 		return typeGen.buildStruct(s);
 	}
 	
+
+	LLVMTypeRef getPtrTypeInContext(LLVMContextRef C) {
+		return LLVMIntTypeInContext(C,bitWidth);
+	}
+
 	auto buildClassType(Class c) {
 		return typeGen.buildClass(c);
 	}
@@ -271,22 +276,22 @@ final class DruntimeGen {
 	
 	auto getAssert() {
 		// TODO: LLVMAddFunctionAttr(fun, LLVMAttribute.NoReturn);
-		return getNamedFunction("_d_assert", LLVMFunctionType(LLVMVoidTypeInContext(llvmCtx), [LLVMStructTypeInContext(llvmCtx, [LLVMIntTypeInContext(llvmCtx,pass.bitWidth), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMInt32TypeInContext(llvmCtx)].ptr, 2, false));
+		return getNamedFunction("_d_assert", LLVMFunctionType(LLVMVoidTypeInContext(llvmCtx), [LLVMStructTypeInContext(llvmCtx, [getPtrTypeInContext(llvmCtx), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMInt32TypeInContext(llvmCtx)].ptr, 2, false));
 	}
 	
 	auto getAssertMessage() {
 		// TODO: LLVMAddFunctionAttr(fun, LLVMAttribute.NoReturn);
-		return getNamedFunction("_d_assert_msg", LLVMFunctionType(LLVMVoidTypeInContext(llvmCtx), [LLVMStructTypeInContext(llvmCtx, [LLVMIntTypeInContext(llvmCtx,pass.bitWidth), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMStructTypeInContext(llvmCtx, [LLVMIntTypeInContext(llvmCtx,pass.bitWidth), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMInt32TypeInContext(llvmCtx)].ptr, 3, false));
+		return getNamedFunction("_d_assert_msg", LLVMFunctionType(LLVMVoidTypeInContext(llvmCtx), [LLVMStructTypeInContext(llvmCtx, [getPtrTypeInContext(llvmCtx), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMStructTypeInContext(llvmCtx, [getPtrTypeInContext(llvmCtx), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMInt32TypeInContext(llvmCtx)].ptr, 3, false));
 	}
 	
 	auto getArrayBound() {
 		// TODO: LLVMAddFunctionAttr(fun, LLVMAttribute.NoReturn);
-		return getNamedFunction("_d_array_bounds", LLVMFunctionType(LLVMVoidTypeInContext(llvmCtx), [LLVMStructTypeInContext(llvmCtx, [LLVMIntTypeInContext(llvmCtx,pass.bitWidth), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMInt32TypeInContext(llvmCtx)].ptr, 2, false));
+		return getNamedFunction("_d_array_bounds", LLVMFunctionType(LLVMVoidTypeInContext(llvmCtx), [LLVMStructTypeInContext(llvmCtx, [getPtrTypeInContext(llvmCtx), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMInt32TypeInContext(llvmCtx)].ptr, 2, false));
 	}
 	
 	auto getAllocMemory() {
 		return getNamedFunction("_d_allocmemory", (p) {
-			auto arg = LLVMIntTypeInContext(p.llvmCtx,p.bitWidth);
+			auto arg = p.getPtrTypeInContext(p.llvmCtx);
 			auto type = LLVMFunctionType(LLVMPointerType(LLVMInt8TypeInContext(p.llvmCtx), 0), &arg, 1, false);
 			auto fun = LLVMAddFunction(p.dmodule, "_d_allocmemory", type);
 			
