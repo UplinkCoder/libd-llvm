@@ -28,7 +28,7 @@ final class LLVMBackend {
 	private string linkerParams;
 	private uint bitWidth;
 
-	this(Context context, string name, uint optLevel, string linkerParams, uint bitWidth) {
+	this(Context context, string name, uint optLevel, string linkerParams) {
 		LLVMInitializeX86TargetInfo();
 		LLVMInitializeX86Target();
 		LLVMInitializeX86TargetMC();
@@ -38,7 +38,8 @@ final class LLVMBackend {
 		
 		this.optLevel = optLevel;
 		this.linkerParams = linkerParams;
-		this.bitWidth = bitWidth;
+		version (D_LP64) bitWidth = 64;
+		else bitWidth = 32;
 		
 		pass = new CodeGenPass(context, name, bitWidth);
 		
