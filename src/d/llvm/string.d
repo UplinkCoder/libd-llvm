@@ -32,7 +32,7 @@ final class StringGen {
 			
 			/*
 			// skip 0 termination.
-			auto indices = [LLVMConstInt(LLVMIntTypeInContext(pass.llvmCtx,pass.bitWidth), 0, true), LLVMConstInt(LLVMIntTypeInContext(pass.llvmCtx,pass.bithWidth), 0, true)];
+			auto indices = [LLVMConstInt(pass.getPtrTypeInContext, 0, true), LLVMConstInt(pass.getPtrTypeInContext, 0, true)];
 			auto ptr = LLVMBuildInBoundsGEP(pass.builder, globalVar, indices.ptr, 2, "");
 			/*/
 			// with 0 termination.
