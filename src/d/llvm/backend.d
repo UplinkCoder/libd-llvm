@@ -40,7 +40,7 @@ final class LLVMBackend {
 		this.optLevel = optLevel;
 		this.linkerParams = linkerParams;
 		import d.semantic.sizeof;
-		bitWidth = SizeofVisitor(sPass).visit(sPass.object.getSizeT());
+		bitWidth = SizeofVisitor(sPass).visit(sPass.object.getSizeT().type)*8;
 		sPass.setEvaluator(getEvaluator());
 
 		pass = new CodeGenPass(context, name, bitWidth);
