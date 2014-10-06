@@ -110,7 +110,7 @@ struct ExpressionGen {
 	
 	private LLVMValueRef handleComparaison(BinaryExpression e, LLVMIntPredicate predicate) {
 		static LLVMIntPredicate workaround;
-		
+
 		auto oldWorkaround = workaround;
 		scope(exit) workaround = oldWorkaround;
 		

@@ -157,7 +157,7 @@ final class TypeGen {
 	LLVMTypeRef visit(BuiltinType t) {
 		final switch(t.kind) with(TypeKind) {
 			case None :
-				assert(0, "Not Implemented");
+				assert(0, "Trying it build None Type");
 			
 			case Void :
 				return LLVMVoidTypeInContext(llvmCtx);
