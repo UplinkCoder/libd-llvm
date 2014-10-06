@@ -20,6 +20,7 @@ import std.stdio;
 import std.string;
 
 final class LLVMBackend {
+	import d.semantic.semantic;
 	private CodeGenPass pass;
 	private LLVMExecutionEngineRef executionEngine;
 	private LLVMEvaluator evaluator;
@@ -28,7 +29,7 @@ final class LLVMBackend {
 	private string linkerParams;
 	private uint bitWidth;
 
-	this(Context context, string name, uint optLevel, string linkerParams) {
+	this(Context context, string name, uint optLevel, string linkerParams,SemanticPass sPass) {
 		LLVMInitializeX86TargetInfo();
 		LLVMInitializeX86Target();
 		LLVMInitializeX86TargetMC();
@@ -38,9 +39,10 @@ final class LLVMBackend {
 		
 		this.optLevel = optLevel;
 		this.linkerParams = linkerParams;
-		version (D_LP64) bitWidth = 64;
-		else bitWidth = 32;
-		
+		import d.semantic.sizeof;
+		bitWidth = SizeofVisitor(sPass).visit(sPass.object.getSizeT());
+		sPass.setEvaluator(getEvaluator());
+
 		pass = new CodeGenPass(context, name, bitWidth);
 		
 		char* errorPtr;
