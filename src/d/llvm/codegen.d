@@ -286,7 +286,7 @@ final class DruntimeGen {
 	
 	auto getArrayBound() {
 		// TODO: LLVMAddFunctionAttr(fun, LLVMAttribute.NoReturn);
-		return getNamedFunction("_d_array_bounds", LLVMFunctionType(LLVMVoidTypeInContext(llvmCtx), [LLVMStructTypeInContext(llvmCtx, [getPtrTypeInContext(llvmCtx), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMInt32TypeInContext(llvmCtx)].ptr, 2, false));
+		return getNamedFunction("_d_arraybounds", LLVMFunctionType(LLVMVoidTypeInContext(llvmCtx), [LLVMStructTypeInContext(llvmCtx, [getPtrTypeInContext(llvmCtx), LLVMPointerType(LLVMInt8TypeInContext(llvmCtx), 0)].ptr, 2, false), LLVMInt32TypeInContext(llvmCtx)].ptr, 2, false));
 	}
 	
 	auto getAllocMemory() {
