@@ -64,7 +64,7 @@ final class CodeGenPass {
 	LLVMValueRef unlikelyBranch;
 	uint profKindID;
 	
-	this(Context context, string name, uint bitWidth) {
+	this(Context context, string modulename, uint bitWidth) {
 		this.context	= context;
 		this.bitWidth   = bitWidth; 
 		
@@ -77,7 +77,7 @@ final class CodeGenPass {
 		
 		llvmCtx = LLVMContextCreate();
 		builder = LLVMCreateBuilderInContext(llvmCtx);
-		dmodule = LLVMModuleCreateWithNameInContext(name.toStringz(), llvmCtx);
+		dmodule = LLVMModuleCreateWithNameInContext(modulename.toStringz(), llvmCtx);
 		
 		LLVMValueRef[3] branch_metadata;
 		

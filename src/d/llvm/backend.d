@@ -29,7 +29,7 @@ final class LLVMBackend {
 	private string linkerParams;
 	private uint bitWidth;
 
-	this(Context context, string name, uint optLevel, string linkerParams,SemanticPass sPass) {
+	this(Context context, string modulename, uint optLevel, string linkerParams,SemanticPass sPass) {
 		LLVMInitializeX86TargetInfo();
 		LLVMInitializeX86Target();
 		LLVMInitializeX86TargetMC();
@@ -42,7 +42,7 @@ final class LLVMBackend {
 		import d.semantic.sizeof;
 		bitWidth = SizeofVisitor(sPass).visit(sPass.object.getSizeT().type)*8;
 		
-		pass = new CodeGenPass(context, name, bitWidth);
+		pass = new CodeGenPass(context, modulename, bitWidth);
 		
 		char* errorPtr;
 		auto creationError = LLVMCreateJITCompilerForModule(&executionEngine, pass.dmodule, 0, &errorPtr);
