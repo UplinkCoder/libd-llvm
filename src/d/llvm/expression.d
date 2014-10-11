@@ -35,6 +35,14 @@ struct ExpressionGen {
 		auto aog = AddressOfGen(pass);
 		return aog.visit(e);
 	}
+
+	LLVMValueRef visit(ArrayLiteral al) {
+		LLVMValueRef[] vals;
+		foreach (val;al.values) {
+			vals~=visit(val);
+		}
+		return LLVMConstArray(pass.visit(al.values[0].type), vals.ptr, al.values.length); 
+	}
 	
 	LLVMValueRef visit(BooleanLiteral bl) {
 		return LLVMConstInt(pass.visit(bl.type), bl.value, false);
@@ -827,7 +835,7 @@ struct AddressOfGen {
 	LLVMValueRef visit(Expression e) {
 		return this.dispatch(e);
 	}
-	
+
 	LLVMValueRef visit(VariableExpression e) {
 		import d.ast.base;
 		assert(e.var.storage != Storage.Enum, "enum have no address.");
