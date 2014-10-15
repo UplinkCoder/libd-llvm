@@ -36,13 +36,13 @@ struct ExpressionGen {
 		return aog.visit(e);
 	}
 
-	LLVMValueRef visit(ArrayLiteral al) {
+/*	LLVMValueRef visit(ArrayLiteral al) {
 		LLVMValueRef[] vals;
 		foreach (val;al.values) {
 			vals~=visit(val);
 		}
 		return LLVMConstArray(pass.visit(al.values[0].type), vals.ptr, al.values.length); 
-	}
+	}*/
 	
 	LLVMValueRef visit(BooleanLiteral bl) {
 		return LLVMConstInt(pass.visit(bl.type), bl.value, false);
@@ -392,6 +392,10 @@ struct ExpressionGen {
 		// Conclude that block.
 		LLVMBuildBr(builder, resultBB);
 
+		// Codegen of then can change the current block, so we put everything in order.
+		ifTrueBB = LLVMGetInsertBlock(builder);
+		LLVMMoveBasicBlockAfter(ifFalseBB, ifTrueBB);
+
 		// Emit ifFalse
 		LLVMPositionBuilderAtEnd(builder, ifFalseBB);
 		auto ifFalse = visit(e.ifFalse);
@@ -401,9 +405,9 @@ struct ExpressionGen {
 		// Codegen of then can change the current block, so we put everything in order.
 		ifFalseBB = LLVMGetInsertBlock(builder);
 		LLVMMoveBasicBlockAfter(resultBB, ifFalseBB);
-		LLVMPositionBuilderAtEnd(builder, resultBB);
 		
 		// Generate phi to get the result.
+		LLVMPositionBuilderAtEnd(builder, resultBB);
 		auto phiNode = LLVMBuildPhi(builder, pass.visit(e.type), "");
 		
 		LLVMValueRef[2] incomingValues;
