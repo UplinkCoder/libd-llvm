@@ -159,7 +159,7 @@ struct ExpressionGen {
 		
 		// Conclude that block.
 		LLVMBuildBr(builder, mergeBB);
-		
+
 		// Codegen of then can change the current block, so we put everything in order.
 		rhsBB = LLVMGetInsertBlock(builder);
 		LLVMMoveBasicBlockAfter(mergeBB, rhsBB);
@@ -365,6 +365,55 @@ struct ExpressionGen {
 				return LLVMBuildXor(builder, visit(e.expr), LLVMConstInt(pass.visit(e.type), -1, true), "");
 		}
 	}
+
+	LLVMValueRef visit(TernaryExpression e) {
+		auto cond = visit(e.condition);
+		
+		auto condBB  = LLVMGetInsertBlock(builder);
+		auto fun = LLVMGetBasicBlockParent(condBB);
+		
+		auto ifTrueBB = LLVMAppendBasicBlockInContext(llvmCtx, fun, "ifTrue");
+		auto ifFalseBB = LLVMAppendBasicBlockInContext(llvmCtx, fun, "ifFalse");
+		auto resultBB = LLVMAppendBasicBlockInContext(llvmCtx, fun, "result");
+		
+		LLVMBuildCondBr(builder, cond, ifTrueBB, ifFalseBB);
+		
+		// Emit ifTrue
+		LLVMPositionBuilderAtEnd(builder, ifTrueBB);
+		auto ifTrue = visit(e.ifTrue);
+		// Conclude that block.
+		LLVMBuildBr(builder, resultBB);
+		
+		// Codegen of then can change the current block, so we put everything in order.
+		ifTrueBB = LLVMGetInsertBlock(builder);
+		LLVMMoveBasicBlockAfter(ifFalseBB, ifTrueBB);
+		
+		// Emit ifFalse
+		LLVMPositionBuilderAtEnd(builder, ifFalseBB);
+		auto ifFalse = visit(e.ifFalse);
+		// Conclude that block.
+		LLVMBuildBr(builder, resultBB);
+		
+		// Codegen of then can change the current block, so we put everything in order.
+		ifFalseBB = LLVMGetInsertBlock(builder);
+		LLVMMoveBasicBlockAfter(resultBB, ifFalseBB);
+		
+		// Generate phi to get the result.
+		LLVMPositionBuilderAtEnd(builder, resultBB);
+		auto phiNode = LLVMBuildPhi(builder, pass.visit(e.type), "");
+		
+		LLVMValueRef[2] incomingValues;
+		incomingValues[0] = ifTrue;
+		incomingValues[1] = ifFalse;
+		
+		LLVMBasicBlockRef[2] incomingBlocks;
+		incomingBlocks[0] = ifTrueBB;
+		incomingBlocks[1] = ifFalseBB;
+		
+		LLVMAddIncoming(phiNode, incomingValues.ptr, incomingBlocks.ptr, incomingValues.length);
+		
+		return phiNode;
+	}
 	
 	LLVMValueRef visit(ThisExpression e) {
 		assert(thisPtr, "No this pointer");
@@ -421,7 +470,16 @@ struct ExpressionGen {
 		
 		return dg;
 	}
-	
+
+	LLVMValueRef visit(ConditionalExpression e) {
+		//auto condition = pass.visit(e.condition);
+	//	auto cond = LLVMBuildBinOp
+		//auto cond = LLVMBuildLoad(builder,addressOf(e.condition),"cond");
+		return LLVMValueRef.init;
+		//auto ifTrue = pass.visit(e.ifTrue);
+		//auto ifFalse = pass.visit(e.ifFalse);
+	}
+
 	LLVMValueRef visit(NewExpression e) {
 		auto ctor = visit(e.ctor);
 		auto args = e.args.map!(a => visit(a)).array();
@@ -758,7 +816,7 @@ struct ExpressionGen {
 			return getTypeInfo(c);
 		}
 		
-		assert(0, "Not implemented");
+		assert(0, "getTypeid for "~typeid(peelAlias(t).type).toString~" Not implemented");
 	}
 	
 	LLVMValueRef visit(StaticTypeidExpression e) {
@@ -782,7 +840,11 @@ struct AddressOfGen {
 	LLVMValueRef visit(Expression e) {
 		return this.dispatch(e);
 	}
-	
+
+	LLVMValueRef visit(TernaryExpression e) {
+		throw new CompileException(e.location, "TernaryExpression as l-value is not supported");
+	}
+
 	LLVMValueRef visit(VariableExpression e) {
 		import d.ast.base;
 		assert(e.var.storage != Storage.Enum, "enum have no address.");
