@@ -143,7 +143,7 @@ final class CodeGenPass {
 	
 
 	LLVMTypeRef getPtrTypeInContext(LLVMContextRef C) {
-		return LLVMIntTypeInContext(C,bitWidth);
+		return LLVMIntTypeInContext(C, bitWidth);
 	}
 
 	auto buildClassType(Class c) {
