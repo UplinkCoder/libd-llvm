@@ -163,7 +163,7 @@ final class TypeGen {
 				return LLVMVoidTypeInContext(llvmCtx);
 			
 			case Bool :
-				return LLVMInt1TypeInContext(llvmCtx);
+				return LLVMInt8TypeInContext(llvmCtx);
 			
 			case Char :
 			case Ubyte :
