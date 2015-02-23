@@ -28,6 +28,7 @@ final class CodeGenPass {
 	
 	private SymbolGen symbolGen;
 	private TypeGen typeGen;
+    private string name;
 	
 	private StringGen stringGen;
 	
@@ -66,6 +67,7 @@ final class CodeGenPass {
 	
 	this(Context context, string name) {
 		this.context	= context;
+        this.name       = name;
 		
 		symbolGen		= new SymbolGen(this);
 		typeGen			= new TypeGen(this);
@@ -73,10 +75,11 @@ final class CodeGenPass {
 		stringGen		= new StringGen(this);
 		
 		druntimeGen		= new DruntimeGen(this);
-		
-		llvmCtx = LLVMContextCreate();
+
+        llvmCtx = LLVMContextCreate();
 		builder = LLVMCreateBuilderInContext(llvmCtx);
-		dmodule = LLVMModuleCreateWithNameInContext(name.toStringz(), llvmCtx);
+        dmodule = LLVMModuleCreateWithNameInContext(name.toStringz(), llvmCtx);
+
 		
 		LLVMValueRef[3] branch_metadata;
 		
@@ -99,7 +102,7 @@ final class CodeGenPass {
 			visit(decl);
 		}
 		
-		checkModule();
+        checkModule(dmodule);
 		
 		return m;
 	}
@@ -159,85 +162,10 @@ final class CodeGenPass {
 	auto buildDString(string str) {
 		return stringGen.buildDString(str);
 	}
-	
-	auto ctfe(Expression e, LLVMExecutionEngineRef executionEngine) {
-		scope(failure) LLVMDumpModule(dmodule);
-		
-		auto funType = LLVMFunctionType(visit(e.type), null, 0, false);
-		
-		auto fun = LLVMAddFunction(dmodule, "__ctfe", funType);
-		scope(exit) LLVMDeleteFunction(fun);
-		
-		auto backupCurrentBB = LLVMGetInsertBlock(builder);
-		scope(exit) {
-			if(backupCurrentBB) {
-				LLVMPositionBuilderAtEnd(builder, backupCurrentBB);
-			} else {
-				LLVMClearInsertionPosition(builder);
-			}
-		}
-		
-		auto bodyBB = LLVMAppendBasicBlockInContext(llvmCtx, fun, "");
-		LLVMPositionBuilderAtEnd(builder, bodyBB);
-		
-		// Generate function's body.
-		import d.llvm.expression;
-		auto eg = ExpressionGen(this);
-		LLVMBuildRet(builder, eg.visit(e));
-		
-		checkModule();
-		
-		auto result = LLVMRunFunction(executionEngine, fun, 0, null);
-		scope(exit) LLVMDisposeGenericValue(result);
-		
-		return LLVMGenericValueToInt(result, true);
-	}
-	
-	auto ctString(Expression e, LLVMExecutionEngineRef executionEngine) in {
-		// FIXME: newtype
-		// assert(cast(SliceType) peelAlias(e.type).type, "this only CTFE strings.");
-	} body {
-		scope(failure) LLVMDumpModule(dmodule);
-		
-		// Create a global variable that recieve the string.
-		auto reciever = LLVMAddGlobal(dmodule, visit(e.type), "__ctString");
-		scope(exit) LLVMDeleteGlobal(reciever);
-		
-		auto funType = LLVMFunctionType(LLVMVoidTypeInContext(llvmCtx), null, 0, false);
-		
-		auto fun = LLVMAddFunction(dmodule, "__ctfe", funType);
-		scope(exit) LLVMDeleteFunction(fun);
-		
-		auto backupCurrentBB = LLVMGetInsertBlock(builder);
-		scope(exit) {
-			if(backupCurrentBB) {
-				LLVMPositionBuilderAtEnd(builder, backupCurrentBB);
-			} else {
-				LLVMClearInsertionPosition(builder);
-			}
-		}
-		
-		auto bodyBB = LLVMAppendBasicBlockInContext(llvmCtx, fun, "");
-		LLVMPositionBuilderAtEnd(builder, bodyBB);
-		
-		// Generate function's body.
-		import d.llvm.expression;
-		auto eg = ExpressionGen(this);
-		LLVMBuildStore(builder, eg.visit(e), reciever);
-		LLVMBuildRetVoid(builder);
-		
-		checkModule();
-		
-		string s;
-		LLVMAddGlobalMapping(executionEngine, reciever, &s);
-		LLVMRunFunction(executionEngine, fun, 0, null);
-		
-		return s.idup;
-	}
-	
-	auto checkModule() {
+
+	auto checkModule(LLVMModuleRef mod) {
 		char* msg;
-		if(LLVMVerifyModule(dmodule, LLVMVerifierFailureAction.ReturnStatus, &msg)) {
+        if(LLVMVerifyModule(mod, LLVMVerifierFailureAction.ReturnStatus, &msg)) {
 			scope(exit) LLVMDisposeMessage(msg);
 			
 			import std.c.string;

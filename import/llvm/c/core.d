@@ -576,6 +576,15 @@ LLVMModuleRef LLVMModuleCreateWithNameInContext(const(char)* ModuleID,
  */
 void LLVMDisposeModule(LLVMModuleRef M);
 
+
+/**
+ * Clone a module instance.
+ *
+ * Return an exact copy of the specified module.
+ */
+LLVMModuleRef LLVMCloneModule(LLVMModuleRef M);
+
+
 /**
  * Obtain the data layout for a module.
  *

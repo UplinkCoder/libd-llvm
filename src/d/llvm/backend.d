@@ -39,9 +39,10 @@ final class LLVMBackend {
 		this.linkerParams = linkerParams;
 		
 		pass = new CodeGenPass(context, name);
-		
+        		
 		char* errorPtr;
-		auto creationError = LLVMCreateJITCompilerForModule(&executionEngine, pass.dmodule, 0, &errorPtr);
+
+        auto creationError = LLVMCreateMCJITCompilerForModule(&executionEngine, pass.dmodule,  null, 0,  &errorPtr);
 		if(creationError) {
 			scope(exit) LLVMDisposeMessage(errorPtr);
 			
@@ -52,7 +53,7 @@ final class LLVMBackend {
 			assert(0, "Cannot create execution engine ! Exiting...");
 		}
 		
-		evaluator = new LLVMEvaluator(executionEngine, pass);
+		evaluator = new LLVMEvaluator(pass);
 	}
 	
 	auto getPass() {
@@ -76,6 +77,8 @@ final class LLVMBackend {
 			visit(m);
 		}
 		
+        // TODO(Sha):  Probably need some adjustments here. 
+
 		auto dmodule = pass.dmodule;
 		
 		auto pmb = LLVMPassManagerBuilderCreate();
@@ -95,6 +98,9 @@ final class LLVMBackend {
 		auto pm = LLVMCreatePassManager();
 		scope(exit) LLVMDisposePassManager(pm);
 		
+
+        // TODO(Shammah): Figure this question out:
+        // Why do we need executionEngine here?  What does this do
 		LLVMAddTargetData(LLVMGetExecutionEngineTargetData(executionEngine), pm);
 		LLVMPassManagerBuilderPopulateModulePassManager(pmb, pm);
 		
