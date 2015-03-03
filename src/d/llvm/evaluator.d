@@ -98,7 +98,8 @@ final class LLVMEvaluator : Evaluator {
         // It doesn't make sense to be passing this in here, and adding code to dmodule
         // FIXME(Shammah): Figure out what to do about this.
         
-        auto jitModule = LLVMCloneModule( codeGen.dmodule );
+        //auto jitModule = LLVMCloneModule( codeGen.dmodule );
+        auto jitModule = codeGen.dmodule;
         scope(exit) LLVMDisposeModule(jitModule);
         auto executionEngine = createExecutionEngine(jitModule);
         scope(exit) LLVMDisposeExecutionEngine(executionEngine);
@@ -110,7 +111,7 @@ final class LLVMEvaluator : Evaluator {
         auto funType = LLVMFunctionType(codeGen.visit(e.type), null, 0, false);
         
         auto fun = LLVMAddFunction(jitModule, "__ctfe", funType);
-        //scope(exit) LLVMDeleteFunction(fun);
+        scope(exit) LLVMDeleteFunction(fun);
         
         auto backupCurrentBB = LLVMGetInsertBlock(codeGen.builder);
         scope(exit) {

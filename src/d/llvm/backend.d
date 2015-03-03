@@ -32,7 +32,7 @@ final class LLVMBackend {
 		LLVMInitializeX86Target();
 		LLVMInitializeX86TargetMC();
 		
-		LLVMLinkInJIT();
+		LLVMLinkInMCJIT();
 		LLVMInitializeX86AsmPrinter();
 		
 		this.optLevel = optLevel;
