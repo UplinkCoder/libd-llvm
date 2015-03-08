@@ -97,20 +97,12 @@ final class LLVMEvaluator : Evaluator {
         // When execution engine is made, it has a reference to dmodule.
         // It doesn't make sense to be passing this in here, and adding code to dmodule
         // FIXME(Shammah): Figure out what to do about this.
-        
-        //auto jitModule = LLVMCloneModule( codeGen.dmodule );
-        auto jitModule = codeGen.dmodule;
-        scope(exit) LLVMDisposeModule(jitModule);
-        auto executionEngine = createExecutionEngine(jitModule);
-        scope(exit) LLVMDisposeExecutionEngine(executionEngine);
 
-        // TODO(Shammah): Dispose this somehow?
-
-        scope(failure) LLVMDumpModule(jitModule);
+        scope(failure) LLVMDumpModule(codeGen.dmodule);
         
         auto funType = LLVMFunctionType(codeGen.visit(e.type), null, 0, false);
         
-        auto fun = LLVMAddFunction(jitModule, "__ctfe", funType);
+        auto fun = LLVMAddFunction(codeGen.dmodule, "__ctfe", funType);
         scope(exit) LLVMDeleteFunction(fun);
         
         auto backupCurrentBB = LLVMGetInsertBlock(codeGen.builder);
@@ -129,11 +121,16 @@ final class LLVMEvaluator : Evaluator {
         import d.llvm.expression;
         auto eg = ExpressionGen(codeGen);
         LLVMBuildRet(codeGen.builder, eg.visit(e));
+        codeGen.checkModule(codeGen.dmodule);
 
-        codeGen.checkModule(jitModule);
+		auto jitModule = LLVMCloneModule( codeGen.dmodule );
+		//scope(exit) LLVMDisposeModule(jitModule);
+		auto executionEngine = createExecutionEngine(jitModule);
+		//scope(exit) LLVMDisposeExecutionEngine(executionEngine);
         
-        
-        auto result = LLVMRunFunction(executionEngine, fun, 0, null);
+		auto jitFun = LLVMGetNamedFunction(jitModule, "__ctfe");
+
+        auto result = LLVMRunFunction(executionEngine, jitFun, 0, null);
         scope(exit) LLVMDisposeGenericValue(result);
         
         return LLVMGenericValueToInt(result, true);
@@ -143,23 +140,14 @@ final class LLVMEvaluator : Evaluator {
         // FIXME: newtype
         // assert(cast(SliceType) peelAlias(e.type).type, "this only CTFE strings.");
     } body {
-        auto jitModule = LLVMCloneModule( codeGen.dmodule );
-        scope(exit) LLVMDisposeModule(jitModule);
-        scope(failure) LLVMDumpModule(jitModule);
-
-        // TODO(Shammah): Dispose this somehow?
-        auto executionEngine = createExecutionEngine(jitModule);
-        scope(exit) LLVMDisposeExecutionEngine(executionEngine);
-        // TODO(Shammah): Dispose this somehow?
-        
         // Create a global variable that recieve the string.
-        auto reciever = LLVMAddGlobal(jitModule, codeGen.visit(e.type), "__ctString");
+        auto reciever = LLVMAddGlobal(codeGen.dmodule, codeGen.visit(e.type), "__ctString");
         //scope(exit) LLVMDeleteGlobal(reciever);
         
         auto funType = LLVMFunctionType(LLVMVoidTypeInContext(codeGen.llvmCtx), null, 0, false);
         
-        auto fun = LLVMAddFunction(jitModule, "__ctfe", funType);
-        //scope(exit) LLVMDeleteFunction(fun);
+        auto fun = LLVMAddFunction(codeGen.dmodule, "__ctfe", funType);
+        scope(exit) LLVMDeleteFunction(fun);
         
         auto backupCurrentBB = LLVMGetInsertBlock(codeGen.builder);
         scope(exit) {
@@ -179,11 +167,20 @@ final class LLVMEvaluator : Evaluator {
         LLVMBuildStore(codeGen.builder, eg.visit(e), reciever);
         LLVMBuildRetVoid(codeGen.builder);
         
-        codeGen.checkModule(jitModule);
+        codeGen.checkModule(codeGen.dmodule);
+
+		auto jitModule = LLVMCloneModule( codeGen.dmodule );
+		//scope(exit) LLVMDisposeModule(jitModule);
+		//scope(failure) LLVMDumpModule(jitModule);
+		auto executionEngine = createExecutionEngine(jitModule);
+		//scope(exit) LLVMDisposeExecutionEngine(executionEngine);
+
+		auto jitFun = LLVMGetNamedFunction(jitModule, "__ctfe");
+		auto jitReceiver = LLVMGetNamedGlobal(jitModule, "__ctString");
 
         string s;
-        LLVMAddGlobalMapping(executionEngine, reciever, &s);
-        LLVMRunFunction(executionEngine, fun, 0, null);
+		LLVMAddGlobalMapping(executionEngine, jitReceiver, &s);
+        LLVMRunFunction(executionEngine, jitFun, 0, null);
         
         return s.idup;
     }

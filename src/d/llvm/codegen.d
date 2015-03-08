@@ -101,7 +101,7 @@ final class CodeGenPass {
 		foreach(decl; m.members) {
 			visit(decl);
 		}
-		
+
         checkModule(dmodule);
 		
 		return m;
