@@ -141,9 +141,19 @@ final class LLVMEvaluator : Evaluator {
         // assert(cast(SliceType) peelAlias(e.type).type, "this only CTFE strings.");
     } body {
         // Create a global variable that recieve the string.
-        auto reciever = LLVMAddGlobal(codeGen.dmodule, codeGen.visit(e.type), "__ctString");
-        //scope(exit) LLVMDeleteGlobal(reciever);
-        
+		auto stringType = codeGen.visit(e.type);
+		auto receiver = LLVMAddGlobal(codeGen.dmodule, stringType, "__ctString");
+		scope(exit) LLVMDeleteGlobal(receiver);
+
+
+		LLVMValueRef[2] constInit = [ LLVMConstInt( LLVMInt64TypeInContext( codeGen.llvmCtx), 0, false),
+			LLVMConstNull( LLVMPointerType (LLVMInt8TypeInContext(codeGen.llvmCtx),0)) ];
+		LLVMDumpValue(LLVMGetUndef(stringType));
+		LLVMDumpValue(LLVMConstStruct( constInit.ptr, 2, false ));
+		LLVMDumpValue(receiver);
+		LLVMSetInitializer(receiver, LLVMConstStructInContext( codeGen.llvmCtx, constInit.ptr, 2, false ));
+		LLVMDumpValue(receiver);
+
         auto funType = LLVMFunctionType(LLVMVoidTypeInContext(codeGen.llvmCtx), null, 0, false);
         
         auto fun = LLVMAddFunction(codeGen.dmodule, "__ctfe", funType);
@@ -164,10 +174,11 @@ final class LLVMEvaluator : Evaluator {
         // Generate function's body.
         import d.llvm.expression;
         auto eg = ExpressionGen(codeGen);
-        LLVMBuildStore(codeGen.builder, eg.visit(e), reciever);
+		LLVMBuildStore(codeGen.builder, eg.visit(e), receiver);
         LLVMBuildRetVoid(codeGen.builder);
         
         codeGen.checkModule(codeGen.dmodule);
+		import std.stdio;
 
 		auto jitModule = LLVMCloneModule( codeGen.dmodule );
 		//scope(exit) LLVMDisposeModule(jitModule);
@@ -176,14 +187,17 @@ final class LLVMEvaluator : Evaluator {
 		//scope(exit) LLVMDisposeExecutionEngine(executionEngine);
 
 		auto jitFun = LLVMGetNamedFunction(jitModule, "__ctfe");
-		auto jitReceiver = LLVMGetNamedGlobal(jitModule, "__ctString");
-
-        string s;
-		LLVMAddGlobalMapping(executionEngine, jitReceiver, &s);
+		writeln("Foo");
+		LLVMDumpValue(jitFun);
         LLVMRunFunction(executionEngine, jitFun, 0, null);
-        
+		auto jitReceiver = LLVMGetNamedGlobal(jitModule, "__ctString");
+		auto glob = LLVMGetPointerToGlobal(executionEngine, jitReceiver);
+
+		LLVMDumpValue(jitReceiver);
+
+		string s = *(cast(string*)glob);
+		writeln("\"",s, "\"");
         return s.idup;
     }
-
 }
 
