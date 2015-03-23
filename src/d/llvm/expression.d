@@ -124,7 +124,7 @@ struct ExpressionGen {
 			return handleComparaison(e, unsignedPredicate);
 		}
 		
-		assert(0, "Don't know how to compare " ~ /+ e.lhs.type.toString(context) ~ +/" with "/+ ~ e.rhs.type.toString(context) +/);
+		assert(0, "Can't compare " ~ e.lhs.type.toString(context) ~ " with " ~ e.rhs.type.toString(context));
 	}
 	
 	private auto handleLogicalBinary(bool shortCircuitOnTrue)(BinaryExpression e) {
@@ -411,7 +411,7 @@ struct ExpressionGen {
 		
 		// Codegen of lhs can change the current block, so we put everything in order.
 		lhsBB = LLVMGetInsertBlock(builder);
-		LLVMMoveBasicBlockAfter(lhsBB, rhsBB);
+		LLVMMoveBasicBlockAfter(rhsBB, lhsBB);
 		
 		// Emit rhs
 		LLVMPositionBuilderAtEnd(builder, rhsBB);
@@ -590,6 +590,35 @@ struct ExpressionGen {
 		return slice;
 	}
 	
+	private LLVMValueRef buildBitCast(LLVMValueRef v, LLVMTypeRef t) {
+		auto k = LLVMGetTypeKind(t);
+		if (k != LLVMTypeKind.Struct) {
+			assert(k != LLVMTypeKind.Array);
+			return LLVMBuildBitCast(builder, v, t, "");
+		}
+		
+		auto vt = LLVMTypeOf(v);
+		assert(LLVMGetTypeKind(vt) == LLVMTypeKind.Struct);
+		
+		auto count = LLVMCountStructElementTypes(t);
+		assert(LLVMCountStructElementTypes(vt) == count);
+		
+		LLVMTypeRef types[];
+		types.length = count;
+		
+		LLVMGetStructElementTypes(t, types.ptr);
+		
+		auto ret = LLVMGetUndef(t);
+		foreach (i; 0 .. count) {
+			ret = LLVMBuildInsertValue(builder, ret, buildBitCast(
+				LLVMBuildExtractValue(builder, v, i, ""),
+				types[i],
+			), i, "");
+		}
+		
+		return ret;
+	}
+	
 	LLVMValueRef visit(CastExpression e) {
 		auto value = visit(e.expr);
 		auto type = pass.visit(e.type);
@@ -625,7 +654,7 @@ struct ExpressionGen {
 				return LLVMBuildZExt(builder, value, type, "");
 			
 			case Bit :
-				return LLVMBuildBitCast(builder, value, type, "");
+				return buildBitCast(value, type);
 			
 			case Qual :
 			case Exact :
@@ -870,8 +899,7 @@ struct AddressOfGen {
 		if (base.isLvalue) {
 			ptr = visit(base);
 		} else {
-			auto eg = ExpressionGen(pass);
-			ptr = eg.visit(base);
+			ptr = ExpressionGen(pass).visit(base);
 		}
 		
 		// Pointer auto dereference in D.
@@ -981,7 +1009,7 @@ struct AddressOfGen {
 			return LLVMBuildInBoundsGEP(builder, ptr, indices.ptr, indices.length, "");
 		}
 		
-		assert(0, "Don't know how to index "/+ ~ indexed.type.toString(context) +/);
+		assert(0, "Don't know how to index " ~ indexed.type.toString(context));
 	}
 }
 
