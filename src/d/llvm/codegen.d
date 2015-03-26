@@ -25,13 +25,14 @@ import std.string;
 
 final class CodeGenPass {
 	Context context;
-	
+
+	bool inJit;
 	private SymbolGen symbolGen;
 	private TypeGen typeGen;
     private string name;
-	
+
 	private StringGen stringGen;
-	
+
 	DruntimeGen druntimeGen;
 	
 	ObjectReference object;
@@ -65,9 +66,10 @@ final class CodeGenPass {
 	LLVMValueRef unlikelyBranch;
 	uint profKindID;
 	
-	this(Context context, string name) {
+	this(Context context, string name, bool inJit = false) {
 		this.context	= context;
         this.name       = name;
+		this.inJit		= inJit;
 		
 		symbolGen		= new SymbolGen(this);
 		typeGen			= new TypeGen(this);

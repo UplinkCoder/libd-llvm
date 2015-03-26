@@ -20,27 +20,36 @@ final class StringGen {
 	auto buildDString(string str) in {
 		assert(str.length <= uint.max, "string length must be <= uint.max");
 	} body {
-		return stringLiterals.get(str, stringLiterals[str] = {
-			auto charArray = LLVMConstStringInContext(pass.llvmCtx, str.ptr, cast(uint) str.length, true);
-			
-			auto globalVar = LLVMAddGlobal(pass.dmodule, LLVMTypeOf(charArray), ".str");
-			LLVMSetInitializer(globalVar, charArray);
-			LLVMSetLinkage(globalVar, LLVMLinkage.Private);
-			LLVMSetGlobalConstant(globalVar, true);
-			
+		if (!pass.inJit) {
+			return stringLiterals.get(str, stringLiterals[str] = {
+				auto charArray = LLVMConstStringInContext(pass.llvmCtx, str.ptr, cast(uint) str.length, true);
+				
+				auto globalVar = LLVMAddGlobal(pass.dmodule, LLVMTypeOf(charArray), ".str");
+				LLVMSetInitializer(globalVar, charArray);
+				LLVMSetLinkage(globalVar, LLVMLinkage.Private);
+				LLVMSetGlobalConstant(globalVar, true);
+				
+				auto length = LLVMConstInt(LLVMInt64TypeInContext(pass.llvmCtx), str.length, false);
+				
+				/*
+				// skip 0 termination.
+				auto indices = [LLVMConstInt(LLVMInt64TypeInContext(pass.llvmCtx), 0, true), LLVMConstInt(LLVMInt64TypeInContext(pass.llvmCtx), 0, true)];
+				auto ptr = LLVMBuildInBoundsGEP(pass.builder, globalVar, indices.ptr, 2, "");
+				/*/
+				// with 0 termination.
+				auto ptr = LLVMBuildGlobalStringPtr(pass.builder, str.toStringz(), ".cstr");
+				//*/
+				
+				return LLVMConstStructInContext(pass.llvmCtx, [length, ptr].ptr, 2, false);
+			}());
+		} else {
+			//auto charArray = LLVMConstStringInContext(pass.llvmCtx, str.ptr, cast(uint) str.length, true);
 			auto length = LLVMConstInt(LLVMInt64TypeInContext(pass.llvmCtx), str.length, false);
-			
-			/*
-			// skip 0 termination.
-			auto indices = [LLVMConstInt(LLVMInt64TypeInContext(pass.llvmCtx), 0, true), LLVMConstInt(LLVMInt64TypeInContext(pass.llvmCtx), 0, true)];
-			auto ptr = LLVMBuildInBoundsGEP(pass.builder, globalVar, indices.ptr, 2, "");
-			/*/
-			// with 0 termination.
-			auto ptr = LLVMBuildGlobalStringPtr(pass.builder, str.toStringz(), ".cstr");
-			//*/
-			
-			return LLVMConstStructInContext(pass.llvmCtx, [length, ptr].ptr, 2, false);
-		}());
+			auto ptr = LLVMBuildGlobalStringPtr(pass.builder, str.toStringz(), "");
+			//auto ptr = LLVMPointerType(LLVMTypeOf(charArray),0);
+			auto ret = LLVMConstStructInContext(pass.llvmCtx, [length, ptr].ptr, 2, false);
+			return ret;
+		}
 	}
 }
 

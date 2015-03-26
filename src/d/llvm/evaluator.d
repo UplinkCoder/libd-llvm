@@ -1,13 +1,14 @@
 module d.llvm.evaluator;
-
+import d.context;
 import d.llvm.codegen;
-
+import d.ir.type;
 import d.ir.expression;
 
 import d.semantic.evaluator;
 
 import util.visitor;
 
+import llvm.c.analysis;
 import llvm.c.core;
 import llvm.c.executionEngine;
 
@@ -19,6 +20,18 @@ extern(C) void _d_assert(string, int);
 extern(C) void _d_assert_msg(string, string, int);
 extern(C) void _d_arraybounds(string, int);
 extern(C) void* _d_allocmemory(size_t);
+
+bool isString(Type t) {
+	if (t.hasElement) {
+		auto et = t.element.getCanonical();
+		if (et.kind == TypeKind.Builtin && et.builtin == BuiltinType.Char) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 
 final class LLVMEvaluator : Evaluator {
 	private CodeGenPass codeGen;
@@ -123,7 +136,7 @@ final class LLVMEvaluator : Evaluator {
         LLVMBuildRet(codeGen.builder, eg.visit(e));
         codeGen.checkModule(codeGen.dmodule);
 
-		auto jitModule = LLVMCloneModule( codeGen.dmodule );
+		auto jitModule = /*LLVMCloneModule(*/ codeGen.dmodule;// );
 		//scope(exit) LLVMDisposeModule(jitModule);
 		auto executionEngine = createExecutionEngine(jitModule);
 		//scope(exit) LLVMDisposeExecutionEngine(executionEngine);
@@ -132,32 +145,39 @@ final class LLVMEvaluator : Evaluator {
 
         auto result = LLVMRunFunction(executionEngine, jitFun, 0, null);
         scope(exit) LLVMDisposeGenericValue(result);
-        
+		import std.stdio;
+		//writeln("Dumping Module");
+		//LLVMDumpModule(codeGen.dmodule);
+
+		writeln(LLVMGenericValueToPointer(result));
         return LLVMGenericValueToInt(result, true);
     }
     
     string evalString(Expression e) in {
         // FIXME: newtype
-        // assert(cast(SliceType) peelAlias(e.type).type, "this only CTFE strings.");
+		assert(isString(e.type), "this only CTFE strings.");
     } body {
+		import std.c.stdlib;
+		void* scratchpad = malloc(512);
+		import d.semantic.type;
+		import std.stdio;
+		writeln(typeid(e),(cast(CallExpression)e).callee.type.toString(codeGen.context));
+		codeGen.inJit = true;
+		scope (exit) codeGen.inJit = false;
+		auto llvm_memref = LLVMCreateGenericValueOfPointer(scratchpad); 	
+		//auto recv = LLVMAddGlobal(codeGen.dmodule, LLVMPointerType(codeGen.visit(Type.get(BuiltinType.Void)), 0), "_scratchpad");
         // Create a global variable that recieve the string.
-		auto stringType = codeGen.visit(e.type);
-		auto receiver = LLVMAddGlobal(codeGen.dmodule, stringType, "__ctString");
-		scope(exit) LLVMDeleteGlobal(receiver);
+		auto stringTypePtr = LLVMPointerType(codeGen.visit(e.type),0);
 
 
-		LLVMValueRef[2] constInit = [ LLVMConstInt( LLVMInt64TypeInContext( codeGen.llvmCtx), 0, false),
-			LLVMConstNull( LLVMPointerType (LLVMInt8TypeInContext(codeGen.llvmCtx),0)) ];
-		LLVMDumpValue(LLVMGetUndef(stringType));
-		LLVMDumpValue(LLVMConstStruct( constInit.ptr, 2, false ));
-		LLVMDumpValue(receiver);
-		LLVMSetInitializer(receiver, LLVMConstStructInContext( codeGen.llvmCtx, constInit.ptr, 2, false ));
-		LLVMDumpValue(receiver);
+		auto funType = LLVMFunctionType(codeGen.visit(Type.get(BuiltinType.Ulong)), null, 0, false);
 
-        auto funType = LLVMFunctionType(LLVMVoidTypeInContext(codeGen.llvmCtx), null, 0, false);
+		//auto funType = LLVMFunctionType(LLVMPointer(codeGen.visit(Type.get(BuiltinType.Char)), 0), null, 0, false);
         
         auto fun = LLVMAddFunction(codeGen.dmodule, "__ctfe", funType);
         scope(exit) LLVMDeleteFunction(fun);
+
+//		scope(exit) LLVMViewFunctionCFG(fun);
         
         auto backupCurrentBB = LLVMGetInsertBlock(codeGen.builder);
         scope(exit) {
@@ -174,30 +194,41 @@ final class LLVMEvaluator : Evaluator {
         // Generate function's body.
         import d.llvm.expression;
         auto eg = ExpressionGen(codeGen);
-		LLVMBuildStore(codeGen.builder, eg.visit(e), receiver);
-        LLVMBuildRetVoid(codeGen.builder);
-        
+		auto expr = eg.visit(e);
+		auto alloc = LLVMBuildAlloca(codeGen.builder, codeGen.visit(e.type), "");
+		auto str = LLVMBuildStore(codeGen.builder, expr, alloc);
+		auto len = LLVMBuildStructGEP(codeGen.builder, alloc, 0, "");
+		auto ptr = LLVMBuildStructGEP(codeGen.builder, alloc, 1, "");
+		//LLVMBuildStore(codeGen.builder, expr, );
+		//auto ret = LLVMBuildAlloca(codeGen.builder, codeGen.visit(Type.get(BuiltinType.Ulong)),"");
+		auto ret = LLVMBuildLoad(codeGen.builder, len, "");
+		LLVMBuildRet(codeGen.builder, ret);
+		LLVMDumpModule(codeGen.dmodule);
         codeGen.checkModule(codeGen.dmodule);
 		import std.stdio;
 
-		auto jitModule = LLVMCloneModule( codeGen.dmodule );
+		auto jitModule = /*LLVMCloneModule(*/ codeGen.dmodule;// );
 		//scope(exit) LLVMDisposeModule(jitModule);
 		//scope(failure) LLVMDumpModule(jitModule);
 		auto executionEngine = createExecutionEngine(jitModule);
 		//scope(exit) LLVMDisposeExecutionEngine(executionEngine);
 
-		auto jitFun = LLVMGetNamedFunction(jitModule, "__ctfe");
-		writeln("Foo");
-		LLVMDumpValue(jitFun);
-        LLVMRunFunction(executionEngine, jitFun, 0, null);
-		auto jitReceiver = LLVMGetNamedGlobal(jitModule, "__ctString");
-		auto glob = LLVMGetPointerToGlobal(executionEngine, jitReceiver);
+		//auto jitFun = LLVMGetNamedFunction(jitModule, "__ctfe");
+		writeln(typeid(expr));
+		//LLVMDumpValue(jitFun);
+		//auto jitReceiver = LLVMGetNamedGlobal(jitModule, "__ctString");
+		//auto glob = LLVMGetPointerToGlobal(executionEngine, receiver);
 
-		LLVMDumpValue(jitReceiver);
+		//LLVMDumpValue(receiver);
 
-		string s = *(cast(string*)glob);
+		string s;
+		//LLVMAddGlobalMapping(executionEngine, receiver, &s);
+		auto result = LLVMRunFunction(executionEngine, fun, 1, &llvm_memref);
+		scope(exit) LLVMDisposeGenericValue(result);
+		//LLVMDumpGenericValue(result);
+		writeln(LLVMGenericValueToInt(result, false));
 		writeln("\"",s, "\"");
-        return s.idup;
+        return "____";
     }
 }
 
