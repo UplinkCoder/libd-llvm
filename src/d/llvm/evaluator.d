@@ -10,6 +10,7 @@ import util.visitor;
 
 import llvm.c.core;
 import llvm.c.executionEngine;
+import llvm.c.target;
 
 import std.algorithm;
 import std.array;
@@ -156,14 +157,14 @@ final class LLVMEvaluator : Evaluator {
 		
 		// Initialize __ctString
 		LLVMValueRef[2] constInit = [
-			LLVMConstInt(LLVMInt64TypeInContext(codeGen.llvmCtx), 0, false),
+			LLVMConstInt(LLVMIntPtrTypeInContext(codeGen.llvmCtx, codeGen.targetData), 0, false),
 			LLVMConstNull(LLVMPointerType(LLVMInt8TypeInContext(codeGen.llvmCtx), 0)),
 		];
 		
 		LLVMSetInitializer(receiver, LLVMConstStructInContext(codeGen.llvmCtx, constInit.ptr, 2, false));
 		
 		// Generate function signature
-		auto funType = LLVMFunctionType(LLVMInt64TypeInContext(codeGen.llvmCtx), null, 0, false);
+		auto funType = LLVMFunctionType(LLVMIntPtrTypeInContext(codeGen.llvmCtx, codeGen.targetData), null, 0, false);
 		auto fun = LLVMAddFunction(codeGen.dmodule, "__ctfe", funType);
 		scope(exit) LLVMDeleteFunction(fun);
 		
@@ -183,7 +184,7 @@ final class LLVMEvaluator : Evaluator {
 		import d.llvm.expression;
 		LLVMBuildStore(codeGen.builder, ExpressionGen(codeGen).visit(e), receiver);
 		// FIXME This is 64bit only code.
-		auto ptrToInt = LLVMBuildPtrToInt(codeGen.builder, receiver, LLVMInt64TypeInContext(codeGen.llvmCtx),"");
+		auto ptrToInt = LLVMBuildPtrToInt(codeGen.builder, receiver, LLVMIntPtrTypeInContext(codeGen.llvmCtx, codeGen.targetData),"");
 		LLVMBuildRet(codeGen.builder, ptrToInt);
 		
 		codeGen.checkModule();
@@ -211,7 +212,7 @@ final class LLVMEvaluator : Evaluator {
 		// FIXME This only works for 64 bit platforms because the retval
 		// of the "__ctfe" is specifically a i64.  This is due to MCJIT
 		// not supporting pointer return values directly at this time. 
-		auto sAsInt = LLVMGenericValueToInt(result, false);
+		auto sAsInt = cast(size_t) LLVMGenericValueToInt(result, false);
 		string s = *cast(string*)cast(void*)sAsInt;
 		return s.idup;
 	}
